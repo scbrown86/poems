@@ -185,11 +185,11 @@ DispersalGenerator <- R6Class("DispersalGenerator",
         if (is.null(coordinates)) {
           stop("Distance matrix calculation requires the region to be defined with coordinates or a raster first", call. = FALSE)
         }
-        if (!self$region$use_raster || (is.logical(use_longlat) && use_longlat) ||
-            length(grep("longlat", as.character(raster::crs(self$region$region_raster)), fixed = TRUE)) > 0) {
+        if (!self$region$use_raster || (is.logical(use_longlat) && use_longlat) || terra::is.lonlat(self$region$region_raster)) {
           return(geosphere::distm(coordinates, coordinates, fun = geosphere::distGeo)/self$distance_scale)
         } else { # assume coordinates in meters
-          if (is.na(raster::crs(self$region$region_raster))) {
+          if (is.na(terra::linearUnits(self$region$region_raster)) || is.nan(terra::linearUnits(self$region$region_raster)) ||
+              terra::crs(self$region$region_raster) == "") {
             warning("No coordinate reference system (CRS) specified: assuming coordinates are in meters", call. = FALSE)
           }
           return(as.matrix(stats::dist(coordinates))/self$distance_scale)

@@ -159,22 +159,22 @@ Generator <- R6Class("Generator",
       }
       for (param in names(attribute_list)) {
         # Check consistency of any rasters
-        if (!is.null(self$region) && any(class(attribute_list[[param]])[1] %in% c("RasterLayer", "RasterStack", "RasterBrick")) &&
+        if (!is.null(self$region) && any(class(attribute_list[[param]])[1] == "SpatRaster") &&
             !self$region$raster_is_consistent(attribute_list[[param]])) {
           self$error_messages <- paste("Region is inconsistent with template generated raster for attribute: ", param)
         }
         if (!is.null(attribute_list[[param]]) && any(c(param, self$attribute_aliases[[param]]) %in% self$outputs) &&
             (is.numeric(attribute_list[[param]]) ||
-             class(attribute_list[[param]])[1] %in% c("data.frame", "RasterLayer", "RasterStack", "RasterBrick"))) {
+             class(attribute_list[[param]])[1] %in% c("data.frame", "SpatRaster"))) {
           # Apply decimal rounding
           if (!is.null(self$decimals)) {
-            attribute_list[[param]][] <- round(attribute_list[[param]][], self$decimals)
+            attribute_list[[param]][] <- round(as.vector(attribute_list[[param]][]), self$decimals)
           }
           # Generate raster or array?
           if (!is.null(self$region)) {
-            if (class(attribute_list[[param]])[1] %in% c("RasterLayer", "RasterStack", "RasterBrick")) {
+            if (class(attribute_list[[param]])[1] == "SpatRaster") {
               if (!self$generate_rasters) { # raster to array
-                attribute_list[[param]] <- attribute_list[[param]][self$region$region_indices]
+                attribute_list[[param]] <- as.vector(attribute_list[[param]][self$region$region_indices])
               }
             } else {
               if (self$generate_rasters && nrow(as.matrix(attribute_list[[param]])) == self$region$region_cells) { # array to raster
@@ -242,10 +242,10 @@ Generator <- R6Class("Generator",
           self$file_templates[[param]] <- list()
           self$file_templates[[param]]$path_template <- path_template
           self$file_templates[[param]]$path_params <- c(path_params)
-          if (toupper(file_type) == "GRD" || toupper(file_type) == "RDS" || toupper(file_type) == "CSV") {
+          if (toupper(file_type) == "TIF" || toupper(file_type) == "RDS" || toupper(file_type) == "CSV") {
             self$file_templates[[param]]$file_type <- toupper(file_type)
           } else {
-            stop("The file type should be GRD (raster), RDS or CSV", call. = FALSE)
+            stop("The file type should be TIF (geotiff), RDS or CSV", call. = FALSE)
           }
         } else {
           stop("Ensure the path template contains a corresponding %s for each path parameter", call. = FALSE)
@@ -351,8 +351,8 @@ Generator <- R6Class("Generator",
               value_list[[param]] <- utils::read.csv(file = file_path)
             } else if (self$file_templates[[param]]$file_type == "RDS") { # RDS (RData)
               value_list[[param]] <- readRDS(file = file_path)
-            } else { # raster
-              value_list[[param]] <- raster::brick(file_path)
+            } else { # terra::rast
+              value_list[[param]] <- terra::rast(file_path)
             }
             if (!param %in% self$model_attributes) {
               self$set_attributes(value_list)
@@ -499,8 +499,8 @@ Generator <- R6Class("Generator",
           }
           if (!is.null(distr_param_values[[distr_param]])) {
             if (!is.null(self$region) && self$region$use_raster &&
-                any(class(distr_param_values[[distr_param]]) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
-              distr_param_values[[distr_param]] <- distr_param_values[[distr_param]][self$region$region_indices]
+                class(distr_param_values[[distr_param]]) == "SpatRaster") {
+              distr_param_values[[distr_param]] <- as.vector(distr_param_values[[distr_param]][self$region$region_indices])
             }
             if (distr_type %in% c("uniform", "triangular")) {
               distr_param_values[[distr_param]][which(!is.finite(distr_param_values[[distr_param]]))] <- NA
@@ -882,14 +882,14 @@ Generator <- R6Class("Generator",
             value <- utils::read.csv(file = value)
           } else if (length(grep(".RDATA", toupper(value), fixed = TRUE)) || length(grep(".RDS", toupper(value), fixed = TRUE))) {
             value <- readRDS(file = value)
-          } else if (length(grep(".GRD", toupper(value), fixed = TRUE))) {
-            value <- raster::brick(value)
+          } else if (length(grep(".TIF", toupper(value), fixed = TRUE))) {
+            value <- terra::rast(value)
           } else {
             value <- utils::read.table(file = value)
           }
         }
         if (!is.null(self$region)) {
-          if (any(class(value) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
+          if (class(value) == "SpatRaster") {
             if (!self$region$raster_is_consistent(value)) {
               stop("Occupancy mask raster must be consistent with the defined region raster", call. = FALSE)
             }

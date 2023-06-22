@@ -139,8 +139,8 @@ SimulationResults <- R6Class("SimulationResults",
           if (!param %in% private$.active_attributes) { # not handled in an accessor
             if (is.null(attribute_list[[param]]) && !is.null(self$parent)) { # calculate via parent
               parent_value <- self$parent$get_attributes(param, remove_burn_in = FALSE)[[param]]
-              if (any(class(parent_value) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
-                parent_value <- parent_value[]
+              if (class(parent_value) == "SpatRaster") {
+                parent_value <- as.vector(parent_value[])
               }
               if (is.matrix(parent_value)) {
                 attribute_list[[param]] <- .colSums(parent_value, m = nrow(parent_value), n = ncol(parent_value), na.rm = TRUE)
@@ -165,7 +165,7 @@ SimulationResults <- R6Class("SimulationResults",
               if (is.matrix(attribute_list[[param]][])) {
                 if (ncol(attribute_list[[param]][]) > self$burn_in_steps) {
                   duration_indices <- (self$burn_in_steps + 1):ncol(as.matrix(attribute_list[[param]][]))
-                  if (any(class(attribute_list[[param]]) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
+                  if (class(attribute_list[[param]]) == "SpatRaster") {
                     attribute_list[[param]] <- attribute_list[[param]][[duration_indices]]
                   } else {
                     attribute_list[[param]] <- attribute_list[[param]][, duration_indices]
@@ -205,11 +205,11 @@ SimulationResults <- R6Class("SimulationResults",
       params <- c(list(...), params) # prioritise individual parameters
       for (param in names(params)) { # check region raster consistency
         if (!param %in% private$.active_attributes) { # not handled in an accessor
-          if (any(class(params[[param]]) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
+          if (class(params[[param]]) == "SpatRaster") {
             if (!is.null(self$region) && !self$region$raster_is_consistent(params[[param]])) {
               self$error_messages <- sprintf("The %s result is not consistent with the defined region raster", param)
               params[[param]] <- NULL
-            } else if (is.numeric(self$time_steps) && !raster::nlayers(params[[param]]) %in% c(1, self$time_steps)) {
+            } else if (is.numeric(self$time_steps) && !terra::nlyr(params[[param]]) %in% c(1, self$time_steps)) {
               self$error_messages <- sprintf("The number of raster layers in the %s result must be one or match the number of time steps", param)
               params[[param]] <- NULL
             }
@@ -334,14 +334,14 @@ SimulationResults <- R6Class("SimulationResults",
           private$.occupancy_mask
         }
       } else {
-        if (any(class(value) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
+        if (class(value) == "SpatRaster") {
           if (!is.null(self$region) && !self$region$raster_is_consistent(value)) {
             stop("Occupancy mask raster must be consistent with the defined region raster", call. = FALSE)
           }
-          cells <- length(which(!is.na(value[[1]][])))
-          width <- raster::nlayers(value)
+          cells <- length(which(!is.na(as.vector(value[[1]][]))))
+          width <- terra::nlyr(value)
         } else if (!is.null(value) && !is.null(self$region) && self$region$use_raster) {
-          stop("Occupancy mask must be a raster layer, stack or brick consistent with the defined region", call. = FALSE)
+          stop("Occupancy mask must be a SpatRaster consistent with the defined region", call. = FALSE)
         } else if (is.matrix(value)) {
           cells <- nrow(value)
           width <- ncol(value)

@@ -1,7 +1,7 @@
 #' R6 class representing a dispersal friction.
 #'
 #' @description
-#' \code{\link[R6:R6Class]{R6}} class functionality for modeling sea, ice and other
+#' \code{\link[R6:R6Class]{R6}} class functionality for modelling coastlines, glacial-ice and other
 #' frictional barriers to dispersal within a spatially-explicit population model. The
 #' dispersal friction model utilizes the
 #' \code{\link[gdistance:gdistance]{gdistance}} package functionality to
@@ -114,7 +114,8 @@ DispersalFriction <- R6Class("DispersalFriction",
 
         suppressWarnings({
           # Calculate raster, transition matrix, then least cost distances for no friction
-          no_friction_rast <- raster_region$region_raster
+          ## gdistance still uses raster internally, so convert to raster object
+          no_friction_rast <- raster::raster(raster_region$region_raster)
           no_friction_rast[] <- 1 # include NAs # [raster_region$region_indices] <- 1
           no_friction_transitions <- gdistance::transition(no_friction_rast, transitionFunction = mean, directions = self$transition_directions)
           no_friction_transitions <- gdistance::geoCorrection(no_friction_transitions, type = "c", scl = TRUE, multpl = FALSE)
@@ -127,16 +128,18 @@ DispersalFriction <- R6Class("DispersalFriction",
         doParallel::registerDoParallel(cores = self$parallel_cores)
         self <- self # Ensure that this object consistently becomes available within each parallel thread
         distance_multipliers <- foreach(i = 1:ncol(as.matrix(self$conductance[])),
-                                        .packages = c("raster"),
+                                        .packages = c("terra", "raster"),
                                         .errorhandling = c("stop")) %dopar% {
           suppressWarnings({
             # Calculate raster, transition matrix, then least cost distances for friction for time step
-            if (any(class(self$conductance) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
-              conductance_rast <- raster::subset(self$conductance, i)
+            if (class(self$conductance == c("SpatRast"))) {
+              conductance_rast <- terra::subset(self$conductance, i)
             } else { # assume friction matrix
               conductance_rast <- raster_region$region_raster
               conductance_rast[raster_region$region_indices] <- self$conductance[, i]
             }
+            # gdistance uses raster internally so coerce to raster::raster
+            conductance_rast <- raster::raster(conductance_rast)
             conductance_transitions <- gdistance::transition(conductance_rast, transitionFunction = mean, directions = self$transition_directions)
             conductance_transitions <- gdistance::geoCorrection(conductance_transitions, type = "c", scl = TRUE, multpl = FALSE)
             conductance_costs <- as.matrix(gdistance::costDistance(conductance_transitions, as.matrix(self$coordinates)))
@@ -216,7 +219,7 @@ DispersalFriction <- R6Class("DispersalFriction",
             warning("Spatial region has not been defined within the region object", call. = FALSE)
           }
           if (!is.null(self$conductance)) {
-            if (any(class(self$conductance) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
+            if (class(self$conductance == "SpatRaster")) {
               value$use_raster = TRUE
               if (!value$raster_is_consistent(self$conductance)) {
                 stop("Region must be consistent with the conductance raster", call. = FALSE)
@@ -241,7 +244,7 @@ DispersalFriction <- R6Class("DispersalFriction",
       } else {
         region <- Region$new(coordinates = value, use_raster = FALSE)
         if (!is.null(value) && !is.null(self$conductance)) {
-          if (any(class(self$conductance) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
+          if (class(self$conductance == "SpatRaster")) {
             region$use_raster <- TRUE
             if (!region$raster_is_consistent(self$conductance)) {
               stop("Region coordinates must be consistent with the conductance raster", call. = FALSE)
@@ -296,14 +299,14 @@ DispersalFriction <- R6Class("DispersalFriction",
             value <- utils::read.csv(file = value)
           } else if (length(grep(".RDATA", toupper(value), fixed = TRUE)) || length(grep(".RDS", toupper(value), fixed = TRUE))) {
             value <- readRDS(file = value)
-          } else if (length(grep(".GRD", toupper(value), fixed = TRUE))) {
-            value <- raster::brick(value)
+          } else if (length(grep(".tif", toupper(value), fixed = TRUE))) {
+            value <- terra::rast(value)
           } else {
             value <- utils::read.table(file = value)
           }
         }
         if (!is.null(value)) {
-          if (any(class(value) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
+          if (class(value) == "SpatRaster") {
             if (!is.null(self$region) && !self$region$raster_is_consistent(value)) {
               stop("Conductance raster must be consistent with the defined region raster", call. = FALSE)
             }

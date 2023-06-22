@@ -13,14 +13,14 @@
 #' template_raster <- Region$new(coordinates = coordinates)$region_raster # full extent
 #' template_raster[][-c(7, 9, 12, 14, 17:19)] <- NA # make U Island
 #' region <- Region$new(template_raster = template_raster)
-#' raster::plot(region$region_raster, main = "Example region (cell indices)",
+#' terra::plot(region$region_raster, main = "Example region (cell indices)",
 #'              xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
 #'              colNA = "blue")
 #' region$region_cells
 #' region$coordinates
 #' # Generate value layers
 #' value_brick <- region$raster_from_values(array(8:28, c(7, 3)))
-#' raster::plot(value_brick, main = "Example value layers",
+#' terra::plot(value_brick, main = "Example value layers",
 #'              xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
 #'              colNA = "blue")
 #' value_brick[region$region_indices]
@@ -67,8 +67,8 @@ Region <- R6Class("Region",
         self$coordinates <- coordinates
       }
       if (!is.null(template_raster)) {
-        if (!("RasterLayer" %in% class(template_raster))) {
-          stop("Template raster should be a raster::RasterLayer (or inherited class) object", call. = FALSE)
+        if (!("SpatRaster" %in% class(template_raster))) {
+          stop("Template raster should be a terra::SpatRaster (or inherited class) object", call. = FALSE)
         }
         template_raster[which(!is.na(template_raster[]))] <- 1:length(which(!is.na(template_raster[])))
         self$region_raster <- template_raster
@@ -87,9 +87,9 @@ Region <- R6Class("Region",
     raster_is_consistent = function(check_raster) {
       region_raster <- self$region_raster
       if (!is.null(region_raster)) {
-        if (any(class(check_raster) %in% c("RasterLayer", "RasterStack", "RasterBrick"))) {
+        if (class(check_raster) == "SpatRaster") {
           region_non_finites <- which(!is.finite(region_raster[]))
-          return(raster::compareRaster(check_raster, region_raster, stopiffalse = FALSE) &&
+          return(terra::compareGeom(check_raster, region_raster, stopOnError = FALSE) &&
                    (all(!is.finite(check_raster[region_non_finites])) || !self$strict_consistency))
         } else {
           return(FALSE)
@@ -100,23 +100,26 @@ Region <- R6Class("Region",
     },
 
     #' @description
-    #' Converts an array (or matrix) of values into a raster (or stack) consistent with the region raster (matching extent, resolution, and finite/NA cells).
-    #' @param values An array (or matrix) of values to be placed in the raster (or stack) having dimensions consistent with the region cell number.
-    #' @return  A \emph{RasterLayer} (or \emph{RasterStack/Brick}) object consistent with the region raster.
+    #' Converts an array (or matrix) of values into a raster (terra::SpatRaster) consistent with the region raster (matching extent, resolution, and finite/NA cells).
+    #' @param values An array (or matrix) of values to be placed in the raster having dimensions consistent with the region cell number.
+    #' @return  A \emph{terra::SpatRaster}) object consistent with the region raster.
     raster_from_values = function(values) {
       value_matrix <- as.matrix(values)
       if (!self$use_raster) {
-        stop("Raster (or stack) can only be generated when the use_raster parameter is TRUE", call. = FALSE)
+        stop("Raster can only be generated when the use_raster parameter is TRUE", call. = FALSE)
       }
       if (nrow(value_matrix) != self$region_cells) {
         stop("Values must have a length or dimensions consistent with the number of region (non-NA) cells", call. = FALSE)
       }
       if (ncol(value_matrix) > 1) { # stack/brick
-        value_raster <- raster::stack(replicate(ncol(value_matrix), self$region_raster))
+        value_raster <- terra::rast(replicate(ncol(value_matrix), self$region_raster))
       } else {
         value_raster <- self$region_raster
       }
       value_raster[self$region_indices] <- value_matrix
+      if (is.null(colnames(value_matrix))) {
+        colnames(value_matrix) <- paste0("Layer_", 1:ncol(value_matrix))
+      }
       names(value_raster) <- colnames(value_matrix)
       return(value_raster)
     }
@@ -141,7 +144,7 @@ Region <- R6Class("Region",
     coordinates = function(value) {
       if (missing(value)) {
         if (self$use_raster && (!is.null(private$.coordinates) || !is.null(private$.region_raster))) {
-          as.data.frame(raster::coordinates(self$region_raster)[self$region_indices, ])
+          terra::crds(self$region_raster, na.rm = FALSE, df = TRUE)[self$region_indices, ]
         } else {
           private$.coordinates
         }
@@ -174,26 +177,27 @@ Region <- R6Class("Region",
       }
     },
 
-    #' @field region_raster A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with finite values (NAs elsewhere).
+    #' @field region_raster A \emph{SpatRaster} object (see \code{\link[terra:terra-package]{terra}}) defining the region with finite values (NAs elsewhere).
     region_raster = function(value) {
       if (missing(value)) {
         if (is.null(private$.region_raster) && !is.null(private$.coordinates) && self$use_raster) {
           # suppressWarnings(raster::rasterFromXYZ(cbind(private$.coordinates, cell = 1:nrow(private$.coordinates)),
           #                                        crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")) # warnings?
-          raster::rasterFromXYZ(cbind(private$.coordinates, cell = 1:nrow(private$.coordinates)),
-                                crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+          terra::rast(cbind(private$.coordinates, cell = 1:nrow(private$.coordinates)),
+                      type = "xyz", crs = "EPSG:4326") # assume EPSG:4326
         } else {
           private$.region_raster
         }
       } else {
-        if (!is.null(value) && !("RasterLayer" %in% class(value))) {
-          stop("Region raster should be a raster::RasterLayer (or inherited class) object", call. = FALSE)
+        if (!is.null(value) && !("SpatRaster" %in% class(value))) {
+          stop("Region raster should be a terra::SpatRaster (or inherited class) object", call. = FALSE)
         }
         if (!is.null(value) && !is.null(private$.coordinates)) {
           stop("Region is already associated with a set of coordinates", call. = FALSE)
         }
-        if (raster::fromDisk(value)) { # move to memory
-          raster::values(value) <- raster::values(value)
+        if (!terra::inMemory(value)) { # move to memory
+          ## ?terra::set.values
+          terra::set.values(value)
         }
         private$.region_raster <- value
       }
@@ -223,7 +227,7 @@ Region <- R6Class("Region",
         if (self$use_raster) {
           region_raster <- self$region_raster
           if (!is.null(region_raster)) {
-            length(which(!is.na(region_raster[])))
+            length(which(!is.na(as.vector(region_raster[]))))
           } else {
             0
           }
@@ -245,8 +249,9 @@ Region <- R6Class("Region",
         if (self$use_raster) {
           region_raster <- self$region_raster
           if (!is.null(region_raster)) {
-            region_indices <- which(!is.na(region_raster[]))
-            region_indices[order(region_raster[region_indices])]
+            region_indices <- which(!is.na(as.vector(region_raster[])))
+            region_indices[unlist(region_raster[region_indices])]
+            #region_indices[order(region_raster[region_indices])]
           } else {
             NA
           }

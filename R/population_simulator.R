@@ -140,11 +140,17 @@
 #'                                  initial_abundance = rep(10, 7),
 #'                                  carrying_capacity = array(70:1, c(7, 10)),
 #'                                  harvest = harvest,
-#'                                  results_selection = c("abundance", "harvested"))
+#'                                  results_selection = c("abundance", "harvested"),
+#'                                  random_seed = 15)
 #' # Simulations
-#' population_simulator(pop_model) # model
+#' results <- population_simulator(pop_model) # model
+#' results
 #' inputs <- pop_model$get_attributes()
 #' population_simulator(inputs) # list
+#'
+#' # convert results to raster
+#' plot(region$raster_from_values(results$abundance), type = "continuous", range = c(0, 30))
+#' plot(region$raster_from_values(results$harvested), type = "continuous", range = c(0, 12))
 #'
 #' @include SimulatorReference.R
 #' @include population_transitions.R

@@ -16,14 +16,14 @@ coordinates <- data.frame(x = rep(seq(177.01, 177.05, 0.01), 5),
 template_raster <- Region$new(coordinates = coordinates)$region_raster # full extent
 template_raster[][-c(7, 9, 12, 14, 17:19)] <- NA # make U Island
 region <- Region$new(template_raster = template_raster)
-raster::plot(region$region_raster, main = "Example region (cell indices)",
+terra::plot(region$region_raster, main = "Example region (cell indices)",
              xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
              colNA = "blue")
 region$region_cells
 region$coordinates
 # Generate value layers
 value_brick <- region$raster_from_values(array(8:28, c(7, 3)))
-raster::plot(value_brick, main = "Example value layers",
+terra::plot(value_brick, main = "Example value layers",
              xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
              colNA = "blue")
 value_brick[region$region_indices]
@@ -45,7 +45,7 @@ value_brick[region$region_indices]
 \describe{
 \item{\code{coordinates}}{Data frame (or matrix) of X-Y population (WGS84) coordinates in longitude (degrees West) and latitude (degrees North) (get and set), or distance-based coordinates dynamically returned by region raster (get only).}
 
-\item{\code{region_raster}}{A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with finite values (NAs elsewhere).}
+\item{\code{region_raster}}{A \emph{SpatRaster} object (see \code{\link[terra:terra-package]{terra}}) defining the region with finite values (NAs elsewhere).}
 
 \item{\code{use_raster}}{Boolean to indicate that a raster is to be used to define the region (default TRUE).}
 
@@ -128,7 +128,7 @@ Boolean to indicate if the raster is consistent with the region raster.
 \if{html}{\out{<a id="method-Region-raster_from_values"></a>}}
 \if{latex}{\out{\hypertarget{method-Region-raster_from_values}{}}}
 \subsection{Method \code{raster_from_values()}}{
-Converts an array (or matrix) of values into a raster (or stack) consistent with the region raster (matching extent, resolution, and finite/NA cells).
+Converts an array (or matrix) of values into a raster (terra::SpatRaster) consistent with the region raster (matching extent, resolution, and finite/NA cells).
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Region$raster_from_values(values)}\if{html}{\out{</div>}}
 }
@@ -136,12 +136,12 @@ Converts an array (or matrix) of values into a raster (or stack) consistent with
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{values}}{An array (or matrix) of values to be placed in the raster (or stack) having dimensions consistent with the region cell number.}
+\item{\code{values}}{An array (or matrix) of values to be placed in the raster having dimensions consistent with the region cell number.}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-A \emph{RasterLayer} (or \emph{RasterStack/Brick}) object consistent with the region raster.
+A \emph{terra::SpatRaster}) object consistent with the region raster.
 }
 }
 \if{html}{\out{<hr>}}

@@ -4,7 +4,7 @@
 \alias{DispersalFriction}
 \title{R6 class representing a dispersal friction.}
 \description{
-\code{\link[R6:R6Class]{R6}} class functionality for modeling sea, ice and other
+\code{\link[R6:R6Class]{R6}} class functionality for modelling coastlines, glacial-ice and other
 frictional barriers to dispersal within a spatially-explicit population model. The
 dispersal friction model utilizes the
 \code{\link[gdistance:gdistance]{gdistance}} package functionality to
