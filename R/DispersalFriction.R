@@ -124,16 +124,30 @@ DispersalFriction <- R6Class("DispersalFriction",
           no_friction_transitions <- NULL # release from memory
         })
 
+        # TODO distance_multipliers is failing in parallel. Attempt fixes. Error below
+        ## <simpleError in h(simpleError(msg, call)): error in evaluating the argument 'i' in selecting a method for function '[<-': NULL value passed as symbol address>
+        ## due to passing a SpatRaster to a parallel loop
+        ## wrap the spatraster, then unwrap inside the loop?
         # Calculate the (within range) distance multipliers for each time step in parallel
+
         doParallel::registerDoParallel(cores = self$parallel_cores)
+        self$region$region_raster <- terra::wrap(self$region$region_raster)
+        raster_region$region_raster <- terra::wrap(raster_region$region_raster)
+        # self$region$packed_region_raster <- terra::wrap(self$region$region_raster)
+        if (any(class(self$conductance) == "SpatRast")) {
+          self$conductance <- terra::wrap(self$conductance)
+        }
         self <- self # Ensure that this object consistently becomes available within each parallel thread
-        distance_multipliers <- foreach(i = 1:ncol(as.matrix(self$conductance[])),
-                                        .packages = c("terra", "raster"),
-                                        .errorhandling = c("stop")) %dopar% {
+
+        distance_multipliers <- foreach(i = seq_len(ncol(as.matrix(self$conductance[]))),
+                                        .packages = c("terra", "raster", "gdistance"),
+                                        .verbose = TRUE,
+                                        .errorhandling = c("pass")) %dopar% {
           suppressWarnings({
             # Calculate raster, transition matrix, then least cost distances for friction for time step
-            if (class(self$conductance == c("SpatRast"))) {
-              conductance_rast <- terra::subset(self$conductance, i)
+            if (any(class(self$conductance) %in% c("PackedSpatRaster", "SpatRast"))) {
+              conductance_rast <- terra::rast(self$conductance) # unwrap
+              conductance_rast <- conductance_rast[[i]]
             } else { # assume friction matrix
               conductance_rast <- raster_region$region_raster
               conductance_rast[raster_region$region_indices] <- self$conductance[, i]
@@ -219,7 +233,7 @@ DispersalFriction <- R6Class("DispersalFriction",
             warning("Spatial region has not been defined within the region object", call. = FALSE)
           }
           if (!is.null(self$conductance)) {
-            if (class(self$conductance == "SpatRaster")) {
+            if (any(class(self$conductance) %in% c("PackedSpatRaster", "SpatRaster"))) {
               value$use_raster = TRUE
               if (!value$raster_is_consistent(self$conductance)) {
                 stop("Region must be consistent with the conductance raster", call. = FALSE)
@@ -244,7 +258,7 @@ DispersalFriction <- R6Class("DispersalFriction",
       } else {
         region <- Region$new(coordinates = value, use_raster = FALSE)
         if (!is.null(value) && !is.null(self$conductance)) {
-          if (class(self$conductance == "SpatRaster")) {
+          if (any(class(self$conductance) == "SpatRaster")) {
             region$use_raster <- TRUE
             if (!region$raster_is_consistent(self$conductance)) {
               stop("Region coordinates must be consistent with the conductance raster", call. = FALSE)
@@ -299,14 +313,14 @@ DispersalFriction <- R6Class("DispersalFriction",
             value <- utils::read.csv(file = value)
           } else if (length(grep(".RDATA", toupper(value), fixed = TRUE)) || length(grep(".RDS", toupper(value), fixed = TRUE))) {
             value <- readRDS(file = value)
-          } else if (length(grep(".tif", toupper(value), fixed = TRUE))) {
+          } else if (length(grep(".TIF", toupper(value), fixed = TRUE))) {
             value <- terra::rast(value)
           } else {
             value <- utils::read.table(file = value)
           }
         }
         if (!is.null(value)) {
-          if (class(value) == "SpatRaster") {
+          if (any(class(value) %in% c("PackedSpatRaster", "SpatRaster"))) {
             if (!is.null(self$region) && !self$region$raster_is_consistent(value)) {
               stop("Conductance raster must be consistent with the defined region raster", call. = FALSE)
             }

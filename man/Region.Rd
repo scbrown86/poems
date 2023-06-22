@@ -47,6 +47,8 @@ value_brick[region$region_indices]
 
 \item{\code{region_raster}}{A \emph{SpatRaster} object (see \code{\link[terra:terra-package]{terra}}) defining the region with finite values (NAs elsewhere).}
 
+\item{\code{region_raster_packed}}{A \emph{SpatRaster} object (see \code{\link[terra:terra-package]{terra}}) defining the region with finite values (NAs elsewhere).}
+
 \item{\code{use_raster}}{Boolean to indicate that a raster is to be used to define the region (default TRUE).}
 
 \item{\code{strict_consistency}}{Boolean to indicate that, as well as resolution, extent and CRS, consistency checks also ensure that a raster's finite/occupiable cells are the same or a subset of those defined by the region (default TRUE).}
@@ -83,6 +85,7 @@ Initialization method sets coordinates or raster for region.
   coordinates = NULL,
   template_raster = NULL,
   region_raster = NULL,
+  region_raster_packed = NULL,
   use_raster = TRUE,
   ...
 )}\if{html}{\out{</div>}}
@@ -96,6 +99,8 @@ Initialization method sets coordinates or raster for region.
 \item{\code{template_raster}}{A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with example finite values (NAs elsewhere)}
 
 \item{\code{region_raster}}{A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with finite cell indices (NAs elsewhere).}
+
+\item{\code{region_raster_packed}}{A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with finite cell indices (NAs elsewhere).}
 
 \item{\code{use_raster}}{Boolean to indicate that a raster is to be used to define the region (default TRUE).}
 
