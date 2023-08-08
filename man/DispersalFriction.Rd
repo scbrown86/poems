@@ -22,12 +22,12 @@ reducing the effective dispersal range.
 #' U Island example region
 coordinates <- data.frame(x = rep(seq(177.01, 177.05, 0.01), 5),
                           y = rep(seq(-18.01, -18.05, -0.01), each = 5))
-template_raster <- Region$new(coordinates = coordinates)$region_raster #' full extent
-template_raster[][-c(7, 9, 12, 14, 17:19)] <- NA #' make U Island
+template_raster <- Region$new(coordinates = coordinates)$region_raster
+template_raster[][-c(7, 9, 12, 14, 17:19)] <- NA
 region <- Region$new(template_raster = template_raster)
-raster::plot(region$region_raster, main = "Example region (indices)",
-             xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
-             colNA = "blue")
+plot(region$region_raster, main = "Example region (indices)",
+     xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
+     colNA = "grey75")
 
 #' Dispersal distances
 dispersal_gen <- DispersalGenerator$new(region = region)
@@ -40,7 +40,8 @@ dispersal_indices <- as.matrix(dispersal_gen$distance_data$base[,1:2])
 dispersal_friction <- DispersalFriction$new(region = region,
                                             conductance = c(1, 1, 1, 0.5, 1, 1, 1))
 multipliers <- dispersal_friction$calculate_distance_multipliers(dispersal_indices)
-cbind(dispersal_indices, distance = distances[dispersal_indices],
+cbind(dispersal_indices,
+      distance = distances[dispersal_indices],
       multiplier = multipliers[[1]])
 
 #' Note that crossing the water is avoided.

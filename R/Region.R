@@ -2,27 +2,36 @@
 #'
 #' @description
 #' \code{\link[R6:R6Class]{R6}} class representing a study region of spatial grid cells
-#' defined via a list of longitude/latitude cell coordinates (WGS84), or a
-#' \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}).
+#' defined via a list of longitude/latitude cell coordinates (EPSG:4326), or a
+#' \emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}).
 #'
 #' @examples
 #' \dontrun{
 #' # U Island example region
 #' coordinates <- data.frame(x = rep(seq(177.01, 177.05, 0.01), 5),
 #'                           y = rep(seq(-18.01, -18.05, -0.01), each = 5))
-#' template_raster <- Region$new(coordinates = coordinates)$region_raster # full extent
+#'
+#' # create region from coordinates
+#' template_raster <- Region$new(coordinates = coordinates)
+#' template_raster <- template_raster$region_raster # extract region raster
 #' template_raster[][-c(7, 9, 12, 14, 17:19)] <- NA # make U Island
+#'
+#' # create region from raster
 #' region <- Region$new(template_raster = template_raster)
-#' terra::plot(region$region_raster, main = "Example region (cell indices)",
-#'              xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
-#'              colNA = "blue")
+#' plot(region$region_raster, main = "Example region (cell indices)",
+#'      xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
+#'      colNA = "grey75")
 #' region$region_cells
 #' region$coordinates
+#' compareGeom(region$region_raster, unwrap(region$region_raster_packed))
+#' identical(values(region$region_raster), values(unwrap(region$region_raster_packed)))
+#'
 #' # Generate value layers
 #' value_brick <- region$raster_from_values(array(8:28, c(7, 3)))
-#' terra::plot(value_brick, main = "Example value layers",
-#'              xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
-#'              colNA = "blue")
+#' plot(value_brick,
+#'      range = c(8, 28), nc = 3,
+#'      xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
+#'      colNA = "grey75")
 #' value_brick[region$region_indices]
 #' }
 #'
@@ -51,12 +60,13 @@ Region <- R6Class("Region",
                     #' @description
                     #' Initialization method sets coordinates or raster for region.
                     #' @param coordinates Data frame (or matrix) of X-Y coordinates (WGS84) in longitude (degrees West) and latitude (degrees North).
-                    #' @param template_raster A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with example finite values (NAs elsewhere)
-                    #' @param region_raster A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with finite cell indices (NAs elsewhere).
-                    #' @param region_raster_packed A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with finite cell indices (NAs elsewhere).
+                    #' @param template_raster A \emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}) defining the region with example finite values (NAs elsewhere)
+                    #' @param region_raster A \emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}) defining the region with finite cell indices (NAs elsewhere).
+                    #' @param region_raster_packed A \emph{PackedSpatRaster} object (see \code{\link[terra:wrap]{terra}}) identical to the \emph{region_raster}.
                     #' @param use_raster Boolean to indicate that a raster is to be used to define the region (default TRUE).
                     #' @param ... Additional parameters passed individually.
-                    initialize = function(coordinates = NULL, template_raster = NULL, region_raster = NULL, region_raster_packed = NULL, use_raster = TRUE, ...) {
+                    initialize = function(coordinates = NULL, template_raster = NULL, region_raster = NULL,
+                                          region_raster_packed = NULL, use_raster = TRUE, ...) {
                       super$initialize(...)
                       if (!is.null(coordinates) && (!is.null(template_raster) || !is.null(region_raster))) {
                         stop("Region should be specified with a set of coordinates or a raster, not both", call. = FALSE)
@@ -84,7 +94,7 @@ Region <- R6Class("Region",
 
                     #' @description
                     #' Returns a boolean to indicate if a raster is consistent with the region raster (matching extent, resolution, and finite/NA cells).
-                    #' @param check_raster A \emph{RasterLayer}, \emph{RasterStack} or \emph{RasterBrick} object (see \code{\link[raster:raster-package]{raster}}) to check for consistency with the region raster.
+                    #' @param check_raster A \emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}) to check for consistency with the region raster.
                     #' @return Boolean to indicate if the raster is consistent with the region raster.
                     raster_is_consistent = function(check_raster) {
                       region_raster <- self$region_raster
@@ -143,7 +153,7 @@ Region <- R6Class("Region",
                   # Active binding accessors for private attributes (above) #
                   active = list(
 
-                    #' @field coordinates Data frame (or matrix) of X-Y population (WGS84) coordinates in longitude (degrees West) and latitude (degrees North) (get and set), or distance-based coordinates dynamically returned by region raster (get only).
+                    #' @field coordinates Data frame (or matrix) of X-Y population coordinates (EPSG:4326) in longitude (degrees West) and latitude (degrees North) (get and set), or distance-based coordinates dynamically returned by region raster (get only).
                     coordinates = function(value) {
                       if (missing(value)) {
                         if (self$use_raster && (!is.null(private$.coordinates) || !is.null(private$.region_raster))) {
@@ -180,12 +190,10 @@ Region <- R6Class("Region",
                       }
                     },
 
-                    #' @field region_raster A \emph{SpatRaster} object (see \code{\link[terra:terra-package]{terra}}) defining the region with finite values (NAs elsewhere).
+                    #' @field region_raster A \emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}) defining the region with finite values (NAs elsewhere).
                     region_raster = function(value) {
                       if (missing(value)) {
                         if (is.null(private$.region_raster) && !is.null(private$.coordinates) && self$use_raster) {
-                          # suppressWarnings(raster::rasterFromXYZ(cbind(private$.coordinates, cell = 1:nrow(private$.coordinates)),
-                          #                                        crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")) # warnings?
                           terra::rast(cbind(private$.coordinates, cell = 1:nrow(private$.coordinates)),
                                       type = "xyz", crs = "EPSG:4326") # assume EPSG:4326
                         } else {
@@ -206,16 +214,13 @@ Region <- R6Class("Region",
                       }
                     },
 
-                    #' @field region_raster_packed A \emph{SpatRaster} object (see \code{\link[terra:terra-package]{terra}}) defining the region with finite values (NAs elsewhere).
+                    #' @field region_raster_packed A \emph{PackedSpatRaster} object (see \code{\link[terra:wrap]{terra}}) identical to the \emph{region_raster}.
                     region_raster_packed = function(value) {
                       if (missing(value)) {
                         if (is.null(private$.region_raster_packed) && !is.null(private$.coordinates) && self$use_raster) {
-                          # suppressWarnings(raster::rasterFromXYZ(cbind(private$.coordinates, cell = 1:nrow(private$.coordinates)),
-                          #                                        crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")) # warnings?
                           terra::wrap(terra::rast(cbind(private$.coordinates, cell = 1:nrow(private$.coordinates)),
                                       type = "xyz", crs = "EPSG:4326")) # assume EPSG:4326
                         } else {
-                          #private$.region_raster
                           private$.region_raster_packed <- terra::wrap(private$.region_raster)
                         }
                       } else {
@@ -225,7 +230,6 @@ Region <- R6Class("Region",
                         if (!is.null(value) && !is.null(private$.coordinates)) {
                           stop("Region is already associated with a set of coordinates", call. = FALSE)
                         }
-                        #private$.region_raster <- value
                         private$.region_raster_packed <- terra::wrap(value)
                       }
                     },
@@ -278,7 +282,6 @@ Region <- R6Class("Region",
                           if (!is.null(region_raster)) {
                             region_indices <- which(!is.na(as.vector(region_raster[])))
                             region_indices[unlist(region_raster[region_indices])]
-                            #region_indices[order(region_raster[region_indices])]
                           } else {
                             NA
                           }

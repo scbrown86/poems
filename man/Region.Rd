@@ -5,27 +5,36 @@
 \title{R6 class representing a study region.}
 \description{
 \code{\link[R6:R6Class]{R6}} class representing a study region of spatial grid cells
-defined via a list of longitude/latitude cell coordinates (WGS84), or a
-\emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}).
+defined via a list of longitude/latitude cell coordinates (EPSG:4326), or a
+\emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}).
 }
 \examples{
 \dontrun{
 # U Island example region
 coordinates <- data.frame(x = rep(seq(177.01, 177.05, 0.01), 5),
                           y = rep(seq(-18.01, -18.05, -0.01), each = 5))
-template_raster <- Region$new(coordinates = coordinates)$region_raster # full extent
+
+# create region from coordinates
+template_raster <- Region$new(coordinates = coordinates)
+template_raster <- template_raster$region_raster # extract region raster
 template_raster[][-c(7, 9, 12, 14, 17:19)] <- NA # make U Island
+
+# create region from raster
 region <- Region$new(template_raster = template_raster)
-terra::plot(region$region_raster, main = "Example region (cell indices)",
-             xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
-             colNA = "blue")
+plot(region$region_raster, main = "Example region (cell indices)",
+     xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
+     colNA = "grey75")
 region$region_cells
 region$coordinates
+compareGeom(region$region_raster, unwrap(region$region_raster_packed))
+identical(values(region$region_raster), values(unwrap(region$region_raster_packed)))
+
 # Generate value layers
 value_brick <- region$raster_from_values(array(8:28, c(7, 3)))
-terra::plot(value_brick, main = "Example value layers",
-             xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
-             colNA = "blue")
+plot(value_brick,
+     range = c(8, 28), nc = 3,
+     xlab = "Longitude (degrees)", ylab = "Latitude (degrees)",
+     colNA = "grey75")
 value_brick[region$region_indices]
 }
 
@@ -43,11 +52,11 @@ value_brick[region$region_indices]
 \section{Active bindings}{
 \if{html}{\out{<div class="r6-active-bindings">}}
 \describe{
-\item{\code{coordinates}}{Data frame (or matrix) of X-Y population (WGS84) coordinates in longitude (degrees West) and latitude (degrees North) (get and set), or distance-based coordinates dynamically returned by region raster (get only).}
+\item{\code{coordinates}}{Data frame (or matrix) of X-Y population coordinates (EPSG:4326) in longitude (degrees West) and latitude (degrees North) (get and set), or distance-based coordinates dynamically returned by region raster (get only).}
 
-\item{\code{region_raster}}{A \emph{SpatRaster} object (see \code{\link[terra:terra-package]{terra}}) defining the region with finite values (NAs elsewhere).}
+\item{\code{region_raster}}{A \emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}) defining the region with finite values (NAs elsewhere).}
 
-\item{\code{region_raster_packed}}{A \emph{SpatRaster} object (see \code{\link[terra:terra-package]{terra}}) defining the region with finite values (NAs elsewhere).}
+\item{\code{region_raster_packed}}{A \emph{PackedSpatRaster} object (see \code{\link[terra:wrap]{terra}}) identical to the \emph{region_raster}.}
 
 \item{\code{use_raster}}{Boolean to indicate that a raster is to be used to define the region (default TRUE).}
 
@@ -96,11 +105,11 @@ Initialization method sets coordinates or raster for region.
 \describe{
 \item{\code{coordinates}}{Data frame (or matrix) of X-Y coordinates (WGS84) in longitude (degrees West) and latitude (degrees North).}
 
-\item{\code{template_raster}}{A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with example finite values (NAs elsewhere)}
+\item{\code{template_raster}}{A \emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}) defining the region with example finite values (NAs elsewhere)}
 
-\item{\code{region_raster}}{A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with finite cell indices (NAs elsewhere).}
+\item{\code{region_raster}}{A \emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}) defining the region with finite cell indices (NAs elsewhere).}
 
-\item{\code{region_raster_packed}}{A \emph{RasterLayer} object (see \code{\link[raster:raster-package]{raster}}) defining the region with finite cell indices (NAs elsewhere).}
+\item{\code{region_raster_packed}}{A \emph{PackedSpatRaster} object (see \code{\link[terra:wrap]{terra}}) identical to the \emph{region_raster}.}
 
 \item{\code{use_raster}}{Boolean to indicate that a raster is to be used to define the region (default TRUE).}
 
@@ -121,7 +130,7 @@ Returns a boolean to indicate if a raster is consistent with the region raster (
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{check_raster}}{A \emph{RasterLayer}, \emph{RasterStack} or \emph{RasterBrick} object (see \code{\link[raster:raster-package]{raster}}) to check for consistency with the region raster.}
+\item{\code{check_raster}}{A \emph{SpatRaster} object (see \code{\link[terra:rast]{terra}}) to check for consistency with the region raster.}
 }
 \if{html}{\out{</div>}}
 }
