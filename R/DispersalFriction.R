@@ -110,6 +110,7 @@ DispersalFriction <- R6Class("DispersalFriction",
         }
 
         if (is.null(self$conductance)) { # set as 1 for all non-NA cells
+          ### TODO: wrap this? Is this the source of the errors? Could maybe add a new packed conductance layer?
           self$conductance <- terra::rast(raster_region$region_raster_packed)*0 + 1
         }
 
